@@ -240,7 +240,7 @@ async function series(metric, aligner, reducer, start) {
     headers: { Authorization: "Bearer " + token },
   });
   const j = await r.json();
-  if (r.status === 401) throw new Error("auth");
+  if (r.status === 401) { const e = new Error("auth"); e.detail = j.error?.message || ""; throw e; }
   if (!r.ok) throw new Error(j.error?.message || ("HTTP " + r.status));
   let total = 0;
   for (const s of j.timeSeries || [])
@@ -271,7 +271,7 @@ async function refreshUsage() {
   } catch (e) {
     if (e.message === "auth") {
       sessionStorage.removeItem("klikMonitoringToken"); token = null;
-      $("usageNote").innerHTML = 'انتهت الصلاحية (تدوم ساعة). <button class="small" id="grant">جدّد</button>';
+      $("usageNote").innerHTML = 'انتهت الصلاحية (تدوم ساعة). <button class="small" id="grant">جدّد</button> <span class="note" dir="ltr">' + esc(e.detail) + ' · v3</span>';
       $("grant").onclick = async () => { await signIn(); refreshUsage(); };
     } else $("usageNote").textContent = "تعذّر: " + e.message;
   }
