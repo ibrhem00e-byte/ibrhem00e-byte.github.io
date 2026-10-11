@@ -30,6 +30,7 @@
   button { font: inherit; border: 0; border-radius: 10px; padding: 9px 14px; background: var(--line); color: var(--text); cursor: pointer; }
   button.primary { background: var(--gold); color: #1a1400; font-weight: 700; }
   button.small { padding: 5px 10px; font-size: 13px; }
+  a.btn { display: inline-block; text-decoration: none; background: var(--line); color: var(--text); border-radius: 10px; padding: 9px 14px; margin: 4px 0 0 8px; }
   button:disabled { opacity: .5; cursor: default; }
   input { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; width: 100%; }
   label { display: block; color: var(--dim); font-size: 13px; margin-bottom: 4px; }
@@ -83,14 +84,13 @@
     </section>
 
     <section>
-      <h2>استهلاك Firebase اليوم <span class="spacer"></span><button class="small" id="refreshUsage">تحديث</button></h2>
-      <div class="grid">
-        <div class="stat"><div class="n" id="reads">—</div><div class="l">قراءات من ٥٠٬٠٠٠</div><div class="bar" id="readsBar"><i></i></div></div>
-        <div class="stat"><div class="n" id="writes">—</div><div class="l">كتابات من ٢٠٬٠٠٠</div><div class="bar" id="writesBar"><i></i></div></div>
-        <div class="stat"><div class="n" id="deletes">—</div><div class="l">حذف من ٢٠٬٠٠٠</div><div class="bar" id="deletesBar"><i></i></div></div>
-        <div class="stat"><div class="n" id="connections">—</div><div class="l">اتصالات مفتوحة الآن</div></div>
-      </div>
-      <p class="note" id="usageNote">اليوم يبدأ ١٠:٠٠ صباحًا بتوقيت السعودية (منتصف الليل في كاليفورنيا) ويتصفّر العداد معه.</p>
+      <h2>استهلاك Firebase اليوم</h2>
+      <p class="note">الحد المجاني كل يوم: ٥٠٬٠٠٠ قراءة، ٢٠٬٠٠٠ كتابة، ٢٠٬٠٠٠ حذف. يتصفّر ١٠:٠٠ صباحًا بتوقيت السعودية.
+        لو قربت من النص، حان وقت Blaze.</p>
+      <a class="btn" target="_blank" rel="noopener"
+         href="https://console.firebase.google.com/project/klik-b07e6/firestore/databases/-default-/usage">افتح أرقام الاستهلاك ↗</a>
+      <a class="btn" target="_blank" rel="noopener"
+         href="https://dashboard.photonengine.com/">لوحة Photon ↗</a>
     </section>
 
     <section>
@@ -140,7 +140,6 @@ const firebaseConfig = {
   appId: "1:555626700161:web:7305a96a8638fc40691c80",
 };
 const PROJECT = firebaseConfig.projectId;
-const MONITORING = "https://www.googleapis.com/auth/monitoring.read";
 const ONLINE_MS = (120 * 2 + 30) * 1000; // Backend.OnlineWindow
 const PHOTON_CCU = 20;
 
@@ -166,16 +165,12 @@ const num = n => Number(n).toLocaleString("ar-SA");
 const when = ts => ts && ts.toDate ? ts.toDate().toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" }) : "—";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-let token = sessionStorage.getItem("klikMonitoringToken");
 
 async function signIn() {
   const provider = new GoogleAuthProvider();
-  provider.addScope(MONITORING);
   provider.setCustomParameters({ prompt: "select_account" });
   try {
-    const result = await signInWithPopup(auth, provider);
-    token = GoogleAuthProvider.credentialFromResult(result)?.accessToken || null;
-    if (token) sessionStorage.setItem("klikMonitoringToken", token);
+    await signInWithPopup(auth, provider);
   } catch (e) {
     $("loginMsg").textContent = "تعذّر الدخول: " + e.code;
   }
@@ -189,7 +184,7 @@ onAuthStateChanged(auth, async user => {
   if (!user) return;
   $("who").textContent = user.email || "";
   buildLooks();
-  refreshPlayers(); refreshUsage(); refreshReports(); refreshPurchases();
+  refreshPlayers(); refreshReports(); refreshPurchases();
 });
 
 // ---------- players ----------
@@ -216,67 +211,6 @@ async function refreshPlayers() {
   }
 }
 $("refreshPlayers").onclick = refreshPlayers;
-
-// ---------- Firestore usage (Cloud Monitoring) ----------
-function pacificMidnight() {
-  // Firestore's free quota resets at midnight in America/Los_Angeles.
-  const now = new Date();
-  const la = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-  const offset = now.getTime() - la.getTime();
-  la.setHours(0, 0, 0, 0);
-  return new Date(la.getTime() + offset);
-}
-
-async function series(metric, aligner, reducer, start) {
-  const params = new URLSearchParams({
-    filter: `metric.type="${metric}"`,
-    "interval.startTime": start.toISOString(),
-    "interval.endTime": new Date().toISOString(),
-    "aggregation.alignmentPeriod": Math.max(60, Math.floor((Date.now() - start) / 1000)) + "s",
-    "aggregation.perSeriesAligner": aligner,
-    "aggregation.crossSeriesReducer": reducer,
-  });
-  const r = await fetch(`https://monitoring.googleapis.com/v3/projects/${PROJECT}/timeSeries?` + params, {
-    headers: { Authorization: "Bearer " + token },
-  });
-  const j = await r.json();
-  if (r.status === 401) { const e = new Error("auth"); e.detail = j.error?.message || ""; throw e; }
-  if (!r.ok) throw new Error(j.error?.message || ("HTTP " + r.status));
-  let total = 0;
-  for (const s of j.timeSeries || [])
-    for (const p of s.points || []) total += Number(p.value.int64Value ?? p.value.doubleValue ?? 0);
-  return total;
-}
-
-async function refreshUsage() {
-  if (!token) {
-    $("usageNote").innerHTML = 'تحتاج صلاحية القراءة من Google Cloud. <button class="small" id="grant">اسمح</button>';
-    $("grant").onclick = async () => { await signIn(); refreshUsage(); };
-    return;
-  }
-  try {
-    const start = pacificMidnight();
-    const [reads, writes, deletes] = await Promise.all([
-      series("firestore.googleapis.com/document/read_count", "ALIGN_SUM", "REDUCE_SUM", start),
-      series("firestore.googleapis.com/document/write_count", "ALIGN_SUM", "REDUCE_SUM", start),
-      series("firestore.googleapis.com/document/delete_count", "ALIGN_SUM", "REDUCE_SUM", start),
-    ]);
-    $("reads").textContent = num(reads); setBar("readsBar", reads / 50000);
-    $("writes").textContent = num(writes); setBar("writesBar", writes / 20000);
-    $("deletes").textContent = num(deletes); setBar("deletesBar", deletes / 20000);
-    const recent = new Date(Date.now() - 5 * 60 * 1000);
-    const conns = await series("firestore.googleapis.com/network/active_connections", "ALIGN_MAX", "REDUCE_SUM", recent);
-    $("connections").textContent = num(conns);
-    $("usageNote").textContent = "يتصفّر كل يوم ١٠:٠٠ صباحًا بتوقيت السعودية. الأرقام تتأخر دقيقتين إلى ثلاث.";
-  } catch (e) {
-    if (e.message === "auth") {
-      sessionStorage.removeItem("klikMonitoringToken"); token = null;
-      $("usageNote").innerHTML = 'انتهت الصلاحية (تدوم ساعة). <button class="small" id="grant">جدّد</button> <span class="note" dir="ltr">' + esc(e.detail) + ' · v3</span>';
-      $("grant").onclick = async () => { await signIn(); refreshUsage(); };
-    } else $("usageNote").textContent = "تعذّر: " + e.message;
-  }
-}
-$("refreshUsage").onclick = refreshUsage;
 
 function setBar(id, f) {
   const bar = $(id);
