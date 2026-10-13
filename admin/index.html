@@ -79,7 +79,7 @@
         <div class="stat"><div class="n" id="searching">—</div><div class="l">يبحثون عن مباراة</div></div>
         <div class="stat"><div class="n" id="total">—</div><div class="l">كل اللاعبين المسجلين</div></div>
       </div>
-      <p class="note" id="playersNote">«متصل» = فتح اللعبة خلال آخر ٤ دقائق ونصف. Photon المجاني يتحمّل ٢٠ لاعبًا داخل المباريات في نفس اللحظة.</p>
+      <p class="note" id="playersNote">«متصل» = فتح اللعبة خلال آخر ٤ دقائق ونصف. Photon المجاني يتحمّل ١٠٠ لاعب (داخل مباراة + يبحثون) في نفس اللحظة. لو وصلوا ٨٠، حان وقت الترقية.</p>
       <div class="bar" id="ccuBar"><i></i></div>
     </section>
 
@@ -141,15 +141,15 @@ const firebaseConfig = {
 };
 const PROJECT = firebaseConfig.projectId;
 const ONLINE_MS = (120 * 2 + 30) * 1000; // Backend.OnlineWindow
-const PHOTON_CCU = 20;
+const PHOTON_CCU = 100;
 
 // Every look that can be given, as in the game (Economy, CharacterSkins, RevolverSkins). A character comes with its gun.
 const LOOKS = [
   ["knight_mx", "الفارس الذهبي", "legendary"], ["darknos_mx", "ملك الظلام", "legendary"], ["sunlit_mx", "العنقاء", "legendary"],
   ["moon_mx", "فراشة القمر", "epic"], ["khafre_mx", "خفرع", "epic"],
-  ["jester_mx", "المهرج المرح", "rare"], ["superblue_mx", "سيد العاصفة", "rare"],
+  ["jester_mx", "المهرج المرح", "rare"], ["superblue_mx", "فولت", "rare"],
   ["elissa_mx", "إليسا", "special"],
-  ["armor_mx", "المدرع", "common"], ["agent_mx", "كاوبوي", "common"], ["suit_mx", "الكابو", "common"], ["cobalt_mx", "كوبالت", "common"],
+  ["armor_mx", "سايبر", "common"], ["agent_mx", "كاوبوي", "common"], ["suit_mx", "الكابو", "common"], ["cobalt_mx", "كوبالت", "common"],
   ["frost", "حارس القطب (سلاح)", "mythic"], ["meteor", "النيزك (سلاح)", "mythic"],
   ["forest", "روح الغابة (سلاح)", "legendary"], ["viper", "ناب الأفعى (سلاح)", "legendary"],
   ["kraken", "الكراكن (سلاح)", "epic"], ["hook", "الخطّاف (سلاح)", "epic"],
