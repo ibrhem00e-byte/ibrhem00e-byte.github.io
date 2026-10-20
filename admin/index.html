@@ -32,7 +32,7 @@
   button.small { padding: 5px 10px; font-size: 13px; }
   a.btn { display: inline-block; text-decoration: none; background: var(--line); color: var(--text); border-radius: 10px; padding: 9px 14px; margin: 4px 0 0 8px; }
   button:disabled { opacity: .5; cursor: default; }
-  input { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; width: 100%; }
+  input, select { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; width: 100%; }
   label { display: block; color: var(--dim); font-size: 13px; margin-bottom: 4px; }
   .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 12px; }
   .looks { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 14px; }
@@ -109,6 +109,24 @@
     </section>
 
     <section>
+      <h2>أكواد صانعي المحتوى <span class="spacer"></span><button class="small" id="refreshCodes">تحديث</button></h2>
+      <div class="row">
+        <div><label for="codeName">الكود</label><input id="codeName" placeholder="KLIK-ABOOD" style="text-transform:uppercase"></div>
+        <div><label for="codeGold">ذهب</label><input id="codeGold" inputmode="numeric" placeholder="0"></div>
+        <div><label for="codeSilver">فضة</label><input id="codeSilver" inputmode="numeric" placeholder="0"></div>
+      </div>
+      <div class="row">
+        <div><label for="codeMax">كم لاعب يقدر يستخدمه</label><input id="codeMax" inputmode="numeric" placeholder="مثلًا 500"></div>
+        <div><label for="codeDays">ينتهي بعد كم يوم (فاضي = ما ينتهي)</label><input id="codeDays" inputmode="numeric" placeholder="مثلًا 30"></div>
+        <div><label for="codeLook">مظهر (اختياري)</label><select id="codeLook"><option value="">—</option></select></div>
+      </div>
+      <button class="primary" id="makeCode">إنشاء الكود 🎟️</button>
+      <div class="msg" id="codeMsg"></div>
+      <div class="scroll" style="margin-top:12px"><table><thead><tr><th>الكود</th><th>الهدية</th><th>استُخدم</th><th>ينتهي</th><th></th></tr></thead><tbody id="codes"></tbody></table></div>
+      <p class="note">اللاعب يكتب الكود في المتجر ← زر «كود». كل حساب يستخدمه مرة وحدة. الحروف تتحول كبيرة تلقائي، والمسافات تنشال.</p>
+    </section>
+
+    <section>
       <h2>البلاغات <span class="spacer"></span><button class="small" id="refreshReports">تحديث</button></h2>
       <div class="scroll"><table><thead><tr><th>الوقت</th><th>على اللاعب</th><th>السبب</th><th>من</th><th></th></tr></thead><tbody id="reports"></tbody></table></div>
     </section>
@@ -129,7 +147,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, getDoc, getDocs, query, where, orderBy, limit, runTransaction,
-         deleteDoc, getCountFromServer, Timestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+         deleteDoc, getCountFromServer, Timestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // The project's web settings (Firebase console > Project settings > Your apps > KLIK Admin). Not secret: the
 // Firestore rules decide what this page may read or write, and only the developer's Google account may.
@@ -184,7 +202,7 @@ onAuthStateChanged(auth, async user => {
   if (!user) return;
   $("who").textContent = user.email || "";
   buildLooks();
-  refreshPlayers(); refreshReports(); refreshPurchases();
+  refreshPlayers(); refreshReports(); refreshPurchases(); refreshCodes();
 });
 
 // ---------- players ----------
@@ -289,6 +307,59 @@ $("sendGift").onclick = async () => {
     msg.textContent = "تعذّر: " + e.message; msg.classList.add("err");
   }
   $("sendGift").disabled = false;
+};
+
+// ---------- creator codes (Codes.cs) ----------
+for (const [id, name] of LOOKS) {
+  const o = document.createElement("option"); o.value = id; o.textContent = name; $("codeLook").appendChild(o);
+}
+const cleanCode = c => String(c || "").trim().replace(/\s+/g, "").toUpperCase();
+async function refreshCodes() {
+  const body = $("codes");
+  try {
+    const snap = await getDocs(query(collection(db, "codes"), limit(100)));
+    body.innerHTML = snap.empty ? '<tr><td colspan="5" class="note">ما فيه أكواد للحين</td></tr>' : "";
+    snap.forEach(d => {
+      const c = d.data();
+      const gift = [c.gold && num(c.gold) + " ذهب", c.silver && num(c.silver) + " فضة", ...(c.items ? c.items.split(",").map(i => NAMES[i] || i) : [])]
+        .filter(Boolean).join("، ");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><b>${esc(d.id)}</b></td><td>${esc(gift)}</td><td>${num(c.count || 0)} / ${num(c.max || 0)}</td>
+        <td>${c.expires ? when(c.expires) : "—"}</td><td><button class="small">حذف</button></td>`;
+      tr.querySelector("button").onclick = async () => {
+        if (!confirm(`حذف الكود ${d.id}؟ ما أحد بيقدر يستخدمه بعدها.`)) return;
+        await deleteDoc(d.ref); refreshCodes();
+      };
+      body.appendChild(tr);
+    });
+  } catch (e) { body.innerHTML = `<tr><td colspan="5" class="err">تعذّر: ${esc(e.message)}</td></tr>`; }
+}
+$("refreshCodes").onclick = refreshCodes;
+$("makeCode").onclick = async () => {
+  const code = cleanCode($("codeName").value);
+  const gold = parseInt($("codeGold").value || "0", 10) || 0;
+  const silver = parseInt($("codeSilver").value || "0", 10) || 0;
+  const max = parseInt($("codeMax").value || "0", 10) || 0;
+  const days = parseInt($("codeDays").value || "0", 10) || 0;
+  const look = $("codeLook").value;
+  const msg = $("codeMsg"); msg.className = "msg";
+  const bad = t => { msg.textContent = t; msg.classList.add("err"); };
+  if (!/^[A-Z0-9-]{3,30}$/.test(code)) return bad("الكود من ٣ إلى ٣٠ حرف إنجليزي أو رقم أو -");
+  if (!gold && !silver && !look) return bad("اختر ذهب أو فضة أو مظهر");
+  if (gold > 100000 || silver > 1000000) return bad("الكمية كبيرة مرة");
+  if (max < 1) return bad("اكتب كم لاعب يقدر يستخدمه");
+  const ref = doc(db, "codes", code);
+  if ((await getDoc(ref)).exists()) return bad("هذا الكود موجود من قبل");
+  const data = { count: 0, max, made: Timestamp.now() };
+  if (gold) data.gold = gold;
+  if (silver) data.silver = silver;
+  if (look) data.items = look;
+  if (days > 0) data.expires = Timestamp.fromMillis(Date.now() + days * 86400000);
+  try {
+    await setDoc(ref, data);
+    msg.textContent = `تم ✓ الكود ${code}`; msg.classList.add("ok");
+    $("codeName").value = ""; refreshCodes();
+  } catch (e) { bad("تعذّر: " + e.message); }
 };
 
 // ---------- reports ----------
