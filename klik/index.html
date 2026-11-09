@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حمّل KLIK</title>
+<meta property="og:title" content="KLIK: Revolver Arena">
+<meta property="og:image" content="https://ibrhem00e-byte.github.io/klik/icon.jpg">
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #111; color: #eee;
+         font-family: system-ui, -apple-system, sans-serif; text-align: center; padding: 16px; box-sizing: border-box; }
+  img { width: 128px; height: 128px; border-radius: 28px; }
+  h1 { margin: 16px 0 4px; }
+  p { color: #aaa; margin: 0 0 24px; }
+  a.btn { display: block; width: 260px; max-width: 100%; margin: 12px auto; padding: 14px; border-radius: 12px;
+          background: #e8b04a; color: #111; font-weight: bold; text-decoration: none; font-size: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <img src="icon.jpg" alt="KLIK">
+  <h1>KLIK</h1>
+  <p>حمّل اللعبة مجانًا</p>
+  <a class="btn" href="https://apps.apple.com/app/id6821595197">آب ستور (آيفون)</a>
+  <a class="btn" href="https://play.google.com/store/apps/details?id=com.klik.arena">قوقل بلاي (أندرويد)</a>
+</main>
+<script>
+  // Send each phone straight to its own store; the buttons stay for anything else.
+  var ua = navigator.userAgent || "";
+  var iOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (iOS) location.replace("https://apps.apple.com/app/id6821595197");
+  else if (/Android/i.test(ua)) location.replace("https://play.google.com/store/apps/details?id=com.klik.arena");
+</script>
+</body>
+</html>
